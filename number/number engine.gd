@@ -45,7 +45,7 @@ const LAMBERTW_ONE_ZERO = 0.56714329040978387299997
 
 const CRITICAL_HEADERS: PackedFloat64Array = [2.0, exp(1), 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0]
 
-const CRITICAL_TETR_VALUES = [[
+const CRITICAL_TETR_VALUES: Array[PackedFloat64Array] = [[
 	# Base 2 (using http://myweb.astate.edu/wpaulsen/tetcalc/tetcalc.html )
 	1.0, 1.0891180521811202527, 1.1789767925673958433, 1.2701455431742086633, 1.3632090180450091941, 1.4587818160364217007, 1.5575237916251418333, 1.6601571006859253673, 1.7674858188369780435, 1.8804192098842727359, 2.0], [
 	# Base E (using http://myweb.astate.edu/wpaulsen/tetcalc/tetcalc.html )
@@ -68,7 +68,7 @@ const CRITICAL_TETR_VALUES = [[
 	# Base 10 (using http://myweb.astate.edu/wpaulsen/tetcalc/tetcalc.html )
 	1.0, 1.1840100246247336579, 1.4061375836156954169, 1.6802272208863963918, 2.026757028388618927, 2.4770056063449647580, 3.0805252717554819987, 3.9191964192627283911, 5.1351528408331864230, 6.9899611795347148455, 10.0]]
 
-const CRITICAL_SLOG_VALUES = [[
+const CRITICAL_SLOG_VALUES: Array[PackedFloat64Array] = [[
   # Base 2
   -1.0, -0.9194161097107025, -0.8335625019330468, -0.7425599821143978, -0.6466611521029437, -0.5462617907227869, -0.4419033816638769, -0.3342645487554494, -0.224140440909962, -0.11241087890006762, 0.0], [
   # Base E
@@ -1369,29 +1369,29 @@ static func g_lambertw(z: PackedFloat64Array, principal: bool = true, tolerance:
 	
 
 
-static func _critical_section(base: float, n_exp: float, grid: Array) -> float:
+static func _critical_section(base: float, n_exp: float, grid: Array[PackedFloat64Array]) -> float:
 	# this part is simple at least, since it's just 0.1 to 0.9
 	n_exp = clampf(n_exp, 0, 1)
 	n_exp *= 10
 	# have to do this complicated song and dance since one of the critical_headers is exp(1), and in the future I'd like 1.5 as well
 	base = clampf(base, 2, 10)
-	var lower = 0
-	var upper = 0
+	var lower: float = 0
+	var upper: float = 0
 	# basically, if we're between bases, we interpolate each bases' relevant values together
 	# then we interpolate based on what the fractional height is.
 	# accuracy could be improved by doing a non-linear interpolation (maybe), by adding more bases and heights (definitely) but this is AFAIK the best you can get without running some pari.gp or mathematica program to calculate exact values
 	# however, do note http://myweb.astate.edu/wpaulsen/tetcalc/tetcalc.html can do it for arbitrary heights but not for arbitrary bases (2, e, 10 present)
 	for i in range(len(CRITICAL_HEADERS)):
 		if CRITICAL_HEADERS[i] == base: # exact match
-			lower = grid[i][floor(n_exp)]
-			upper = grid[i][ceil(n_exp)]
+			lower = grid[i][floori(n_exp)]
+			upper = grid[i][ceili(n_exp)]
 			break
 		elif CRITICAL_HEADERS[i] < base and base < CRITICAL_HEADERS[i + 1]: # interpolate between this and the next
 			var basefrac = (base - CRITICAL_HEADERS[i]) / (CRITICAL_HEADERS[i + 1] - CRITICAL_HEADERS[i])
-			lower = lerp(grid[i][floor(n_exp)], grid[i + 1][floor(n_exp)], basefrac)
-			upper = lerp(grid[i][ceil(n_exp)], grid[i][floor(n_exp)], basefrac)
+			lower = lerp(grid[i][floori(n_exp)], grid[i + 1][floori(n_exp)], basefrac)
+			upper = lerp(grid[i][ceili(n_exp)], grid[i][floori(n_exp)], basefrac)
 			break
-	var frac = fposmod(n_exp, 1)
+	var frac: float = fposmod(n_exp, 1)
 
 	# improvement - you get more accuracy (especially around 0.9-1.0) by doing log, then frac, then powing the result
 	# (we could pre-log the lookup table, but then fractional bases would get Weird)
