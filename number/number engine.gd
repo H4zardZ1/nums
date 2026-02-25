@@ -10,7 +10,7 @@ class_name BigNumRef
 ## [/codeblock]
 ## with the sign stored on either layer or mag, depending on the number's size.
 ## Based on [url]https://github.com/Patashu/break_eternity.js[/url][br]
-## [b]Note:[/b] All static/singleton methods on this class that returns a Dictionary, excluding [method normalize_n],
+## [b]Note:[/b] All static/singleton methods on this class that returns a PackedFloat64Array, excluding [method normalize_n],
 ## do not mutate the old Dictionaries.
 
 enum BigNumArrayIndices {
@@ -318,17 +318,13 @@ static func normalize_n(n: PackedFloat64Array) -> void:
 	# Handle NANs
 	if is_nan(n[l]) or is_nan(n[m]):
 		n[l] = NAN
-		n[0] = NAN
+		n[m] = NAN
 
 
 
 ## A randomized number struct for testing purposes. Does not have proper random distribution.
-static func testable_random_num_struct(max_layer: float = 2.0 ** 1023.0, rng: RandomNumberGenerator = null) -> Dictionary:
-	var v: Dictionary = {
-			"sign": 0,
-			"layer": 0.0,
-			"mag": 0.0
-		}
+static func testable_random_num_struct(max_layer: float = 2.0 ** 1023.0, rng: RandomNumberGenerator = null) -> PackedFloat64Array:
+	var v: PackedFloat64Array = BIGNUM_ZERO.duplicate()
 	if not is_instance_valid(rng):
 		rng = RandomNumberGenerator.new()
 		rng.randomize()
@@ -344,25 +340,24 @@ static func testable_random_num_struct(max_layer: float = 2.0 ** 1023.0, rng: Ra
 		return v # 0
 
 	if roll1 <= 0.1:
-		v.mag = 1.0
-		v.sign = 1
+		v[0] = 1
 		if roll1 <= 0.075:
-			v.sign = -1
+			v[0] = -1
 		return v # -1, 1
-	v.layer = rng.rand_range(0, max_layer + 1)
+	v[0] = rng.rand_range(0, max_layer + 1)
 
 	var roll2 := rng.randf()
 	var random_exp :float
-	if v.layer == 0:
-		random_exp = rng.randf() * 616 - 308
+	if v[0] == 0:
+		random_exp = rng.randf() * 616 - NUMBER_EXP_MAX
 	else:
 		random_exp = rng.randf() * 16
 	if roll2 <= 0.1:
 		random_exp = floorf(random_exp)
-	v.mag = pow(10, random_exp)
+	v[1] = pow(10, random_exp)
 	var roll3 := rng.randf()
 	if roll3 <= 0.1:
-		v.mag = floorf(v.mag)
+		v[1] = floorf(v[1])
 	return v
 
 ## Converts the number back to a [float].
@@ -579,8 +574,13 @@ static func from_v_no_normalize(arg) -> PackedFloat64Array:
 			return from_float_no_normalize(arg)
 		TYPE_STRING:
 			return from_str(arg)
-		TYPE_DICTIONARY:
+		TYPE_PACKED_FLOAT64_ARRAY:
 			return duplicate_num_only_no_normalize(arg)
+		TYPE_DICTIONARY:
+			if "sign" in arg and arg.sign is int and "layer" in arg and arg.layer is float and "mag" in arg and arg.mag is float:
+				return from_components_no_normalize(arg.sign, arg.layer, arg.mag)
+			push_error("Cannot construct number from dictionary '{arg}'.".format({"arg": arg}))
+			return BIGNUM_NAN.duplicate()
 		TYPE_OBJECT:
 			if "d" in arg and is_bignum(arg.d):
 				return arg.d
@@ -767,8 +767,8 @@ static func g_clamp(n: PackedFloat64Array, n_min: PackedFloat64Array, n_max: Pac
 static func is_bignum(n: PackedFloat64Array)-> bool:
 	return n.size() >= 2
 
-## Returns whether [param n] is a bignum that holds NAN, or if [method is_bignum] returns false(as the dictionary is Not (holding) A Number)[br]
-## Use [method is_bignum] to only check if the dictionary holds a bignum, without checking if the number held is NAN.[br]
+## Returns whether [param n] is a bignum that holds NAN, or if [method is_bignum] returns false(as the array is Not (holding) A Number)[br]
+## Use [method is_bignum] to only check if the array holds a bignum, without checking if the number held is NAN.[br]
 ## See also [method g_is_strictly_nan]
 static func g_is_nan(n: PackedFloat64Array)-> bool:
 	if not is_bignum(n):
