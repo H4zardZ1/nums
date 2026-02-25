@@ -2,16 +2,17 @@ extends RefCounted
 class_name BigNumRef
 ## A class that holds a number that can be larger or smaller than the floating point limit.
 ##
-## A [RefCounted] that stores a single number that uses 2 values (Layer, Magnitude) to represent it. [br]
-## 
+## A [RefCounted] that stores a single number that uses 2 values (Layer, Magnitude) to represent it, 
+## with the sign of the number stored on either the layer or the magnitude, depending on the number's size. [br]
+## [br]
 ## In addition, this library supports operations with the bare 2 values, in [PackedFloat64Array] form, as following: [br]
 ## [codeblock]
-## [layer, mag]
+## [layer, magnitude]
 ## [/codeblock]
-## with the sign stored on either layer or mag, depending on the number's size.
+## [br]
 ## Based on [url]https://github.com/Patashu/break_eternity.js[/url][br]
 ## [b]Note:[/b] All static/singleton methods on this class that returns a PackedFloat64Array, excluding [method normalize_n],
-## do not mutate the old Dictionaries.
+## do not mutate the old Array.
 
 enum BigNumArrayIndices {
 	LAYER = 0,
@@ -383,11 +384,12 @@ static func from_components(num_sign: int, layer: float, mag: float) -> PackedFl
 	
 	return v
 
+# no_normalize is a lie, this normalizes the sign
 ## Creates a new number from the given components.
 static func from_components_no_normalize(num_sign: int, layer: float, mag: float) -> PackedFloat64Array:
 	if layer > 0:
-		return [layer * num_sign, mag]
-	return [0, mag * num_sign]
+		return [absf(layer) * num_sign, mag]
+	return [0, absf(mag) * num_sign]
 
 ## Creates a new normalized number from the given [float].[br]
 ## [b]Note:[/b] Godot should be able to coerce an [int] to a [float].
@@ -616,6 +618,7 @@ static func from_v(arg) -> PackedFloat64Array:
 
 	return v
 
+## Returns the sign of the number.
 static func g_sign(n: PackedFloat64Array) -> int:
 	@warning_ignore_start("narrowing_conversion")
 	if signf(n[0]) != 0:
@@ -2412,16 +2415,19 @@ func n_str_to_decimal_places(round_to: int = default_round_to) -> String:
 func n_eq(n: PackedFloat64Array) -> bool:
 	return BigNumRef.g_eq(n, d)
 
-## Returns whether then number held by this reference is equal to the number [param obj] holds.
+## Returns whether the number held by this reference is equal to the number [param obj] holds.
 func eq(obj: BigNumRef) -> bool:
 	return BigNumRef.g_eq(obj.d, d)
 
+## Returns 1 if the number held by this reference is greater than n, 0 if equal, -1 if n is greater.
 func n_compare(n: PackedFloat64Array) -> int:
 	return BigNumRef.g_compare(d, n)
 
+## Returns whether the number held by this reference is greater than the number [param obj] holds.
 func n_gt(n: PackedFloat64Array) -> bool:
 	return BigNumRef.g_gt(d, n)
 
+## Returns whether the number held by this reference is greater than or equal to the number [param obj] holds.
 func n_gte(n: PackedFloat64Array) -> bool:
 	return BigNumRef.g_gte(d, n)
 
