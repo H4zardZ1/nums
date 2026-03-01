@@ -624,10 +624,10 @@ static func g_get_mantissa(n: PackedFloat64Array) -> float:
 	if n[1] == 0:
 		return 0
 	if n[0] == 0:
-		if is_zero_approx(n[1]):
-			return 5 * g_sign(n)
+		# if is_zero_approx(n[1]):  # Doesn't happen, 1e-298 is below the layer -1 threshold
+		# 	return 5 * g_sign(n)
 		var e: int = floori(log(n[1])/log(10))
-		return g_sign(n) * n[1] / ipow10(e)
+		return n[1] / ipow10(e)
 	if absf(n[0]) == 1:
 		return g_sign(n) * 10 ** fposmod(n[1], 1)
 	return g_sign(n)
@@ -680,7 +680,8 @@ static func g_to_str_to_decimal_places(n: PackedFloat64Array, round_to: int = de
 	if n[0] == 1:
 		if (n[1] < EXPONENT_WRITTEN):
 			return "{m}e{e}".format({"m": snappedf(g_get_mantissa(n), ipow10(-round_to)), "e": var_to_str(g_get_exp(n)).get_slice(".", 0)})
-		return "{m}e{e}".format({"m": snappedf(g_get_mantissa(n), ipow10(-round_to)), "e": snappedf(g_get_exp(n), ipow10(-round_to))})
+		# return "{m}e{e}".format({"m": snappedf(g_get_mantissa(n), ipow10(-round_to)), "e": snappedf(g_get_exp(n), ipow10(-round_to))})
+		return "{m}e{e}".format({"m": g_get_mantissa(n), "e": g_get_exp(n),})
 	if n[0] <= max_es_in_str:
 		if g_sign(n) == -1:
 			return "-1{l}{e}".format({"e": n[1], "l": "e".repeat(floori(n[0]))})
@@ -690,7 +691,7 @@ static func g_to_str_to_decimal_places(n: PackedFloat64Array, round_to: int = de
 	return "1(e^{l}){e}".format({"e": n[1], "l": n[0]})
 
 ## Returns [code]n1 == n2[/code].
-## Prefer using n1 == n2 directly for performance, unless you aren't sure they're of size 2
+## Prefer using n1 == n2 directly for performance, unless you aren't sure both of them have exactly two elements.
 static func g_eq(n1: PackedFloat64Array, n2: PackedFloat64Array)-> bool:
 	return (n1[0] == n2[0] and n1[1] == n2[1])
 
@@ -886,7 +887,7 @@ static func g_mod(n1: PackedFloat64Array, n2: PackedFloat64Array)-> PackedFloat6
 	
 	if g_eq(n1, g_sub(n1, n2)):
 	# Godot returns 0 on n1 way greater than n2
-		return from_float(0)
+		return BIGNUM_ZERO.duplicate()
 
 	# Special case: if n2 is greater than n1, just return n1
 	if g_compare_abs(n1, n2) < 0:
@@ -983,7 +984,7 @@ static func g_add(n1: PackedFloat64Array, n2: PackedFloat64Array)-> PackedFloat6
 		#"dec1": dec1,
 		#"dec2": dec2
 	#}))
-	#return from_float(0)
+	#return BIGNUM_ZERO.duplicate()
 
 ## Returns [code]n1 - n2[/code].
 static func g_sub(n1: PackedFloat64Array, n2: PackedFloat64Array) -> PackedFloat64Array:
@@ -1531,7 +1532,7 @@ static func g_tetrate(base: PackedFloat64Array, n_exp: PackedFloat64Array, paylo
 	n_exp = g_floor(n_exp)
 
 	var v: PackedFloat64Array = duplicate_num_only(payload)
-	if g_compare(from_float(0), base) == -1 and g_compare(base, from_float(exp(1) ** (1/exp(1)))) > 0:
+	if g_compare(BIGNUM_ZERO, base) == -1 and g_compare(base, from_float(exp(1) ** (1/exp(1)))) > 0:
 		# flip-flops between two values, converging slowly (or if it's below 0.06598803584531253708, never).
 		var old_exp := n_exp.duplicate()
 		n_exp = g_num_min(from_float(max_i_tetra), n_exp)
@@ -1548,7 +1549,7 @@ static func g_tetrate(base: PackedFloat64Array, n_exp: PackedFloat64Array, paylo
 			return g_add(g_mul(v, g_sub(BIGNUM_ONE, frac_exp)), g_mul(g_pow(base, v), frac_exp))
 		return v
 	
-	#if g_compare(from_float(0), base) == -1:
+	#if g_compare(BIGNUM_ZERO, base) == -1:
 		#pass
 	
 	if g_eq(frac_exp, BIGNUM_ZERO):
@@ -1640,7 +1641,7 @@ static func g_slog_start(base: PackedFloat64Array, to: PackedFloat64Array, linea
 		v = g_add(v, from_float(layerloss))
 		t = g_sub(t, from_float(layerloss))
 	for i in range(max_i_other):
-		if g_compare(t, from_float(0)) < 0:
+		if g_compare(t, BIGNUM_ZERO) < 0:
 			t = g_pow(base, t)
 			v = g_sub(t, BIGNUM_ONE)
 		elif g_compare(t, from_float(1)) <= 0:
@@ -1724,7 +1725,7 @@ static func g_sroot(to: PackedFloat64Array, degree: PackedFloat64Array) -> Packe
 		else:
 			return BIGNUM_NAN.duplicate()
 	# base < 0 (It'll probably be NaN anyway)
-	if g_compare(to, from_float(0)) <= 0:
+	if g_compare(to, BIGNUM_ZERO) <= 0:
 		return BIGNUM_NAN.duplicate()
 	# Treat all numbers of layer <= -2 as zero, because they effectively are
 	if g_compare(to, [2.0, -16.0]) <= 0:
@@ -1745,7 +1746,7 @@ static func g_sroot(to: PackedFloat64Array, degree: PackedFloat64Array) -> Packe
 			upper_bound_local = g_i_log(to, from_float(10), degree, true)
 		if g_lte(degree, BIGNUM_ONE):
 			upper_bound_local = g_root(to, degree)
-		var lower_local := from_float(0)
+		var lower_local := BIGNUM_ZERO.duplicate()
 		var layer: float = upper_bound_local[0]
 		var upper_local := g_i_log(upper_bound_local, from_float(10), from_float(layer), true)
 		var previous_local = upper_local
@@ -1815,7 +1816,7 @@ static func g_sroot(to: PackedFloat64Array, degree: PackedFloat64Array) -> Packe
 				upper_bound = g_recip(g_pow10(upper))
 				prev_point = g_recip(g_pow10(upper))
 				next_point = g_recip(g_pow10(upper))
-				distance = from_float(0)
+				distance = BIGNUM_ZERO.duplicate()
 				dir = -1 # This would cause problems with degree < 1 in the linear approximation... but those are already covered as a special case
 				if stage == 3:
 					last_valid = duplicate_num_only(upper)
@@ -1823,13 +1824,13 @@ static func g_sroot(to: PackedFloat64Array, degree: PackedFloat64Array) -> Packe
 				upper_bound = g_recip(g_pow10(upper))
 				prev_point = g_recip(g_pow10(upper))
 				next_point = g_recip(g_pow10(upper))
-				distance = from_float(0)
+				distance = BIGNUM_ZERO.duplicate()
 				dir = 0
 			elif g_eq(g_tetrate(g_recip(g_pow10(upper)), degree, from_float(1), true), g_tetrate(g_mul(from_float(2), g_recip(g_pow10(upper))), degree, from_float(1), true)):
 				# If the upper bound is closer to zero than the next point with a discernable tetration, so surely it's in whichever range is closest to zero?
 				# //This won't happen in a strictly increasing tetration, as there x^^degree ~= x as x approaches zero
 				upper_bound = g_recip(g_pow10(upper))
-				prev_point = from_float(0)
+				prev_point = BIGNUM_ZERO.duplicate()
 				next_point = g_mul(upper_bound, from_float(2))
 				distance = duplicate_num_only(upper_bound)
 				if even_degree:
@@ -2114,7 +2115,7 @@ static func g_asinh(n: PackedFloat64Array) -> PackedFloat64Array:
 	# Special Case: Since Godot has asinh, use it on layer 0 numbers
 	if n[0] == 0:
 		return from_float(asinh(n[1]))
-	return g_log(BIGNUM_E, g_add(n, g_root(from_float(2), g_add(from_float(1), g_pow(n, from_float(2))))))
+	return g_log(BIGNUM_E, g_add(n, g_root(from_float(2), g_add(BIGNUM_ONE, g_pow(n, from_float(2))))))
 
 # @GlobalScope.acosh
 ## Returns the hyperbolic arc cosine of [param n] in radians. Use this to get the angle from an angle's cosine in hyperbolic space if [param n] is larger than 1.
@@ -2125,7 +2126,7 @@ static func g_acosh(n: PackedFloat64Array) -> PackedFloat64Array:
 	# Godot wants to return 0 instead of NAN on x < 1. Let's do that
 	if n[1] < 1:
 		return BIGNUM_ZERO.duplicate()
-	return g_log(BIGNUM_E, g_add(n, g_root(from_float(2), g_add(from_float(-1), g_pow(n, from_float(2))))))
+	return g_log(BIGNUM_E, g_add(n, g_root(from_float(2), g_add(BIGNUM_NEG_ONE, g_pow(n, from_float(2))))))
 
 # @ GlobalScope.atanh
 ## Returns the hyperbolic arc tangent of [param n] in radians. Use this to get the angle from an angle's cosine in hyperbolic space.
@@ -2136,7 +2137,7 @@ static func g_atanh(n: PackedFloat64Array) -> PackedFloat64Array:
 	if g_compare_abs(n, BIGNUM_ONE) > 1: 
 		# Godot wants to return signed INF instead of NAN on x > 1 or x < -1. Let's do that
 		return from_components_no_normalize(g_sign(n), INF, INF)
-	return g_div(g_log(BIGNUM_E, g_div(g_add(from_float(1), n), g_sub(from_float(1), n))), from_float(2))
+	return g_div(g_log(BIGNUM_E, g_div(g_add(BIGNUM_ONE, n), g_sub(BIGNUM_ONE, n))), from_float(2))
 
 
 	
