@@ -626,7 +626,7 @@ static func g_get_mantissa(n: PackedFloat64Array) -> float:
 	if n[0] == 0:
 		# if is_zero_approx(n[1]):  # Doesn't happen, 1e-298 is below the layer -1 threshold
 		# 	return 5 * g_sign(n)
-		var e: int = floori(log(n[1])/log(10))
+		var e: int = floori(log(absf(n[1]))/log(10))
 		return n[1] / ipow10(e)
 	if absf(n[0]) == 1:
 		return g_sign(n) * 10 ** fposmod(n[1], 1)
@@ -1074,7 +1074,7 @@ static func g_exp(n: PackedFloat64Array) -> PackedFloat64Array:
 		return from_float(1.0)
 	if n[0] == 0:
 		if n[1] <= 709.7:
-			return from_float(exp(g_sign(n) * n[1]))
+			return from_float(exp(n[1]))
 		return from_components(1, 1, g_sign(n) / log(10) * n[1])
 	if n[0] == 1:
 		return from_components(1, 2, g_sign(n) * ((1/log(10)) + n[1]))
@@ -1191,7 +1191,7 @@ static func g_gamma(n: PackedFloat64Array) -> PackedFloat64Array:
 	if n[0] == 0:
 		# Patashu's source code generates the number struct, but at layer 0 sign * mag IS the whole number
 		if g_sign(n) * n[1] < 24:
-			return from_float(f_gamma(g_sign(n) * n[1]))
+			return from_float(f_gamma(n[1]))
 		
 		var t: float = n[1] - 1
 		var l: float = log(TAU)/2
@@ -1260,7 +1260,7 @@ static func g_factorial(n: PackedFloat64Array) -> PackedFloat64Array:
 				)
 			)
 		)
-	return [n[0] + signf(n[0]), g_sign(n) * n[1]]
+	return [n[0] + signf(n[0]), signf(n[0]) * n[1]]
 
 ## Returns [code]10 ** n[/code].
 static func g_pow10(n: PackedFloat64Array) -> PackedFloat64Array:
@@ -1274,9 +1274,9 @@ static func g_pow10(n: PackedFloat64Array) -> PackedFloat64Array:
 		return BIGNUM_NAN.duplicate()
 	var n2: PackedFloat64Array = duplicate_num_only(n)
 	if n[0] == 0:
-		var newmag: float = 10 ** (g_sign(n) * n[1])
+		var newmag: float = 10 ** (n[1])
 		# Is any precision lost?
-		if is_finite(newmag) and absf(newmag) >= 0.1:
+		if is_finite(newmag) and absf(newmag) >= 1e-15:
 			return [0, newmag]
 		if g_sign(n) == 0:
 			return BIGNUM_ONE.duplicate()
@@ -1284,9 +1284,9 @@ static func g_pow10(n: PackedFloat64Array) -> PackedFloat64Array:
 		n2 = from_components_no_normalize(g_sign(n), n[0] + 1, log(n[1])/log(10))
 
 	# Handle all 4 layer +1 layer cases individually.
-	if g_sign(n2) > 0 and n2[1] >= 0:
+	if n2[1] > 0:
 		return from_components(g_sign(n2), absf(n2[0]) + 1, n2[1])
-	if g_sign(n2) < 0 and n2[1] >= 0:
+	if n2[1] < 0:
 		return from_components(g_sign(n2), absf(n2[0]), -n2[1])
 	
 	return BIGNUM_ONE.duplicate()
@@ -1312,7 +1312,7 @@ static func g_lambertw(z: PackedFloat64Array, principal: bool = true, tolerance:
 			return z
 		
 		if z[1] == 0:
-			return from_float(0.0)
+			return BIGNUM_ZERO.duplicate()
 
 		if z[1] == 1: # Split out this case because the asymptotic series blows up
 			return from_float(LAMBERTW_ONE_ZERO)
@@ -2014,7 +2014,7 @@ static func g_sin(n: PackedFloat64Array) -> PackedFloat64Array:
 	if n[1] < 0:
 		return duplicate_num_only_no_normalize(n)
 	if n[0] == 0:
-		return from_float(sin(g_sign(n) * n[1]))
+		return from_float(sin(n[1]))
 	return BIGNUM_ZERO.duplicate()
 
 # @GlobalScope.cos
@@ -2023,7 +2023,7 @@ static func g_cos(n: PackedFloat64Array) -> PackedFloat64Array:
 	if n[1] < 0:
 		return BIGNUM_ONE.duplicate()
 	if n[0] == 0:
-		return from_float(cos(g_sign(n) * n[1]))
+		return from_float(cos(n[1]))
 	return BIGNUM_ZERO.duplicate()
 
 # @GlobalScope.tan
@@ -2032,7 +2032,7 @@ static func g_tan(n: PackedFloat64Array) -> PackedFloat64Array:
 	if n[1] < 0:
 		return duplicate_num_only_no_normalize(n)
 	if n[0] == 0:
-		return from_float(tan(g_sign(n) * n[1]))
+		return from_float(tan(n[1]))
 	return BIGNUM_ZERO.duplicate()
 
 # @GlobalScope.asin
@@ -2042,7 +2042,7 @@ static func g_asin(n: PackedFloat64Array) -> PackedFloat64Array:
 	if n[1] < 0:
 		return duplicate_num_only_no_normalize(n)
 	if n[0] == 0:
-		return from_float(asin(g_sign(n) * n[1]))
+		return from_float(asin(n[1]))
 	return BIGNUM_ZERO.duplicate()
 
 # @GlobalScope.acos
@@ -2052,7 +2052,7 @@ static func g_acos(n: PackedFloat64Array) -> PackedFloat64Array:
 	if n[1] < 0:
 		return from_float(acos(to_float(n)))
 	if n[0] == 0:
-		return from_float(acos(g_sign(n) * n[1]))
+		return from_float(acos(n[1]))
 	return from_float(TAU/4)
 
 # @GlobalScope.atan
@@ -2061,7 +2061,7 @@ static func g_atan(n: PackedFloat64Array) -> PackedFloat64Array:
 	if n[1] < 0:
 		return duplicate_num_only_no_normalize(n)
 	if n[0] == 0:
-		return from_float(atan(g_sign(n) * n[1]))
+		return from_float(atan(n[1]))
 	# 9e15 < 1.8e308
 	return from_float(atan(minf(absf(to_float(n)), 1.7e308) * signf(n[0])))
 
