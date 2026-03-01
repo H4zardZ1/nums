@@ -287,7 +287,7 @@ static func normalize_n(n: PackedFloat64Array) -> void:
 		n[l] = 0
 		return
 
-	n[l] = floorf(n[l])
+	n[l] = floorf(absf(n[l])) * signf(n[l])
 	# Handle infinities
 	if absf(n[l]) == INF or absf(n[m]) == INF:
 		n[l] = INF * signf(n[l]) if signf(n[l]) != 0 else n[m]
@@ -1565,7 +1565,7 @@ static func g_tetrate(base: PackedFloat64Array, n_exp: PackedFloat64Array, paylo
 					v = g_add(
 						from_float(1), 
 						g_mul(
-							g_sub(base, from_float(1)), g_sub(v, from_float(1))
+							g_sub(base, BIGNUM_ONE), g_sub(v, BIGNUM_ONE)
 						)
 					)
 		else:
