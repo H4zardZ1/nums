@@ -1071,7 +1071,7 @@ static func g_log10(n: PackedFloat64Array) -> PackedFloat64Array:
 ## The natural exponential function. Returns [i]e[/i] ** n, where [i]e[/i] is a mathematical constant with an approximate value of 2.71828.
 static func g_exp(n: PackedFloat64Array) -> PackedFloat64Array:
 	if n[1] < 0:
-		return from_float(1.0)
+		return BIGNUM_ONE.duplicate()
 	if n[0] == 0:
 		if n[1] <= 709.7:
 			return from_float(exp(n[1]))
@@ -1232,7 +1232,7 @@ static func g_gamma(n: PackedFloat64Array) -> PackedFloat64Array:
 						BIGNUM_E, 
 						n
 					),
-					from_float(1)
+					BIGNUM_ONE
 				)
 			)
 		)
@@ -1256,7 +1256,7 @@ static func g_factorial(n: PackedFloat64Array) -> PackedFloat64Array:
 						BIGNUM_E, 
 						n
 					),
-					from_float(1)
+					BIGNUM_ONE
 				)
 			)
 		)
@@ -1414,7 +1414,7 @@ static func g_layer_add(from: PackedFloat64Array, diff: PackedFloat64Array, base
 	elif g_gte(slogdest, BIGNUM_NEG_ONE):
 		return g_log(base, g_tetrate(base, g_add(slogdest, BIGNUM_ONE), BIGNUM_ONE, linear))
 	else: 
-		return g_log(base, g_log(base, g_tetrate(base, g_add(slogdest, [0, 2]), BIGNUM_ONE, linear)))
+		return g_log(base, g_log(base, g_tetrate(base, g_add(slogdest, from_float(2)), BIGNUM_ONE, linear)))
 
 static var max_i_layer_sub_10: int = 100000
 ## Returns (10 ** [param from]) repeated [param diff] times, from the top. See [method g_tetrate].
@@ -1563,7 +1563,7 @@ static func g_tetrate(base: PackedFloat64Array, n_exp: PackedFloat64Array, paylo
 				# TODO: maybe once the critical section grid has very large bases, this math can be appropriate for them too? I'll think about it
 				if g_compare(base, from_float(2)) == -1:
 					v = g_add(
-						from_float(1), 
+						BIGNUM_ONE, 
 						g_mul(
 							g_sub(base, BIGNUM_ONE), g_sub(v, BIGNUM_ONE)
 						)
@@ -1644,7 +1644,7 @@ static func g_slog_start(base: PackedFloat64Array, to: PackedFloat64Array, linea
 		if g_compare(t, BIGNUM_ZERO) < 0:
 			t = g_pow(base, t)
 			v = g_sub(t, BIGNUM_ONE)
-		elif g_compare(t, from_float(1)) <= 0:
+		elif g_compare(t, BIGNUM_ONE) <= 0:
 			# If base > 10, revert to linear
 			if linear or g_compare(base, from_float(10)) > 0: 
 				return g_add(v, t)
@@ -1710,7 +1710,7 @@ static func g_sroot(to: PackedFloat64Array, degree: PackedFloat64Array) -> Packe
 	if g_lt(BIGNUM_ZERO, degree) and g_lt(degree, BIGNUM_ONE):
 		return g_root(to, degree)
 	# Using linear approximation, there actually is a single solution for super roots with -2 < degree <= -1
-	if g_lt(from_float(-2), degree) and g_lt(degree, from_float(-1)):
+	if g_lt(from_float(-2), degree) and g_lt(degree, BIGNUM_NEG_ONE):
 		return g_root(g_add(degree, from_float(2)), to)
 	# Super roots with -1 <= degree < 0 have either no solution or infinitely many solutions, and tetration with height <= -2 returns NaN, so super roots of degree <= -2 don't work
 	if g_lte(degree, BIGNUM_ZERO):
@@ -1812,7 +1812,7 @@ static func g_sroot(to: PackedFloat64Array, degree: PackedFloat64Array) -> Packe
 		inf_loop_detector = false
 		while not g_eq(upper, lower):
 			previous_upper = upper
-			if g_eq(from_float(1), g_tetrate(g_recip(g_pow10(upper)), degree, from_float(1), true)) and g_gte(from_float(0.4), g_recip(g_pow10(upper))):
+			if g_eq(BIGNUM_ONE, g_tetrate(g_recip(g_pow10(upper)), degree, BIGNUM_ONE, true)) and g_gte(from_float(0.4), g_recip(g_pow10(upper))):
 				upper_bound = g_recip(g_pow10(upper))
 				prev_point = g_recip(g_pow10(upper))
 				next_point = g_recip(g_pow10(upper))
@@ -1820,13 +1820,13 @@ static func g_sroot(to: PackedFloat64Array, degree: PackedFloat64Array) -> Packe
 				dir = -1 # This would cause problems with degree < 1 in the linear approximation... but those are already covered as a special case
 				if stage == 3:
 					last_valid = duplicate_num_only(upper)
-			elif g_eq(g_recip(g_pow10(upper)), g_tetrate(g_recip(g_pow10(upper)), degree, from_float(1), true)) and (not even_degree) and g_gte(from_float(0.4), g_recip(g_pow10(upper))):
+			elif g_eq(g_recip(g_pow10(upper)), g_tetrate(g_recip(g_pow10(upper)), degree, BIGNUM_ONE, true)) and (not even_degree) and g_gte(from_float(0.4), g_recip(g_pow10(upper))):
 				upper_bound = g_recip(g_pow10(upper))
 				prev_point = g_recip(g_pow10(upper))
 				next_point = g_recip(g_pow10(upper))
 				distance = BIGNUM_ZERO.duplicate()
 				dir = 0
-			elif g_eq(g_tetrate(g_recip(g_pow10(upper)), degree, from_float(1), true), g_tetrate(g_mul(from_float(2), g_recip(g_pow10(upper))), degree, from_float(1), true)):
+			elif g_eq(g_tetrate(g_recip(g_pow10(upper)), degree, BIGNUM_ONE, true), g_tetrate(g_mul(from_float(2), g_recip(g_pow10(upper))), degree, BIGNUM_ONE, true)):
 				# If the upper bound is closer to zero than the next point with a discernable tetration, so surely it's in whichever range is closest to zero?
 				# //This won't happen in a strictly increasing tetration, as there x^^degree ~= x as x approaches zero
 				upper_bound = g_recip(g_pow10(upper))
@@ -1843,18 +1843,18 @@ static func g_sroot(to: PackedFloat64Array, degree: PackedFloat64Array) -> Packe
 				prev_point = g_recip(g_pow10(g_add(upper, prev_span)))
 				distance = g_sub(upper_bound, prev_point)
 				next_point = g_add(upper_bound, distance)
-				while g_eq(g_tetrate(next_point, degree, from_float(1), true), g_tetrate(upper_bound, degree, from_float(1), true)) or \
-				g_eq(g_tetrate(prev_point, degree, from_float(1), true), g_tetrate(upper_bound, degree, from_float(1), true)) or \
+				while g_eq(g_tetrate(next_point, degree, BIGNUM_ONE, true), g_tetrate(upper_bound, degree, BIGNUM_ONE, true)) or \
+				g_eq(g_tetrate(prev_point, degree, BIGNUM_ONE, true), g_tetrate(upper_bound, degree, BIGNUM_ONE, true)) or \
 				g_gte(prev_point, upper_bound) or g_lte(next_point, upper_bound):
 					prev_span = g_mul(prev_span, from_float(2))
 					prev_point = g_recip(g_pow10(g_add(prev_span, upper)))
 					distance = g_sub(upper_bound, prev_point)
 					next_point = g_add(upper_bound, distance)
-					if (stage == 1 and g_gt(g_tetrate(next_point, degree, from_float(1), true), g_tetrate(upper_bound, degree, from_float(1), true)) and \
-					g_gt(g_tetrate(prev_point, degree, from_float(1), true), g_tetrate(upper_bound, degree, from_float(1), true))) or \
+					if (stage == 1 and g_gt(g_tetrate(next_point, degree, BIGNUM_ONE, true), g_tetrate(upper_bound, degree, BIGNUM_ONE, true)) and \
+					g_gt(g_tetrate(prev_point, degree, BIGNUM_ONE, true), g_tetrate(upper_bound, degree, BIGNUM_ONE, true))) or \
 					g_gte(prev_point, upper_bound) or g_lte(next_point, upper_bound):
 						last_valid = duplicate_num_only(upper)
-					if g_lt(g_tetrate(next_point, degree, from_float(1), true), g_tetrate(upper_bound, degree, from_float(1), true)):
+					if g_lt(g_tetrate(next_point, degree, BIGNUM_ONE, true), g_tetrate(upper_bound, degree, BIGNUM_ONE, true)):
 						# Derivative is negative, so we're in decreasing range
 						dir = -1
 					elif even_degree:
@@ -1864,14 +1864,14 @@ static func g_sroot(to: PackedFloat64Array, degree: PackedFloat64Array) -> Packe
 						# We're already below the minimum, so we can't be in range 1
 						dir = 0
 					else: # Number imprecision has left the second derivative somewhat untrustworthy, so we need to expand the bounds to ensure it's correct
-						while g_eq_approx(g_tetrate(prev_point, degree, from_float(1), true), g_tetrate(upper_bound, degree, from_float(1), true), 1e-8) or \
-						g_eq_approx(g_tetrate(next_point, degree, from_float(1), true), g_tetrate(upper_bound, degree, from_float(1), true), 1e-8) or \
+						while g_eq_approx(g_tetrate(prev_point, degree, BIGNUM_ONE, true), g_tetrate(upper_bound, degree, BIGNUM_ONE, true), 1e-8) or \
+						g_eq_approx(g_tetrate(next_point, degree, BIGNUM_ONE, true), g_tetrate(upper_bound, degree, BIGNUM_ONE, true), 1e-8) or \
 						g_gte(prev_point, upper_bound) or g_lte(next_point, upper_bound):
 							prev_span = g_mul(prev_span, from_float(2))
 							prev_point = g_recip(g_pow10(g_add(upper, prev_span)))
 							distance = g_sub(upper_bound, prev_point)
 							next_point = g_add(upper_bound, distance)
-						if g_lt(g_sub(g_tetrate(next_point, degree, from_float(1), true), g_tetrate(upper_bound, degree, from_float(1), true)), g_sub(g_tetrate(upper_bound, degree, from_float(1), true), g_tetrate(prev_point, degree, from_float(1), true))):
+						if g_lt(g_sub(g_tetrate(next_point, degree, BIGNUM_ONE, true), g_tetrate(upper_bound, degree, BIGNUM_ONE, true)), g_sub(g_tetrate(upper_bound, degree, BIGNUM_ONE, true), g_tetrate(prev_point, degree, BIGNUM_ONE, true))):
 							# Second derivative is negative, so we're in zero range
 							dir = 0
 						else: # By process of elimination, we're in increasing range
@@ -1930,7 +1930,7 @@ static func g_sroot(to: PackedFloat64Array, degree: PackedFloat64Array) -> Packe
 			guess = g_mul(upper, from_float(2))
 		else:
 			guess = g_div(g_add(upper, lower), from_float(2))
-		if g_gt(g_tetrate(g_recip(g_pow(from_float(10), guess)), degree, from_float(1), true), to):
+		if g_gt(g_tetrate(g_recip(g_pow(from_float(10), guess)), degree, BIGNUM_ONE, true), to):
 			upper = duplicate_num_only(guess)
 		else:
 			lower = duplicate_num_only(guess)
@@ -1958,7 +1958,7 @@ static func g_sroot(to: PackedFloat64Array, degree: PackedFloat64Array) -> Packe
 			guess = g_mul(upper, from_float(2))
 		else:
 			guess = g_div(g_add(lower, upper), from_float(2))
-		if g_gt(g_tetrate(g_recip(g_pow(from_float(10), guess)), degree, from_float(1), true), to):
+		if g_gt(g_tetrate(g_recip(g_pow(from_float(10), guess)), degree, BIGNUM_ONE, true), to):
 			upper = duplicate_num_only(guess)
 		else:
 			lower = duplicate_num_only(guess)
@@ -1993,7 +1993,7 @@ static func g_pentate(base: PackedFloat64Array, n_exp: float, payload: PackedFlo
 	var frac_exp : float = fmod(n_exp, 1)
 	# I have no idea if this is a meaningful approximation for pentation to continuous heights, but it is monotonic and continuous.
 	if frac_exp != 0:
-		if g_eq(from_float(1), payload):
+		if g_eq(BIGNUM_ONE, payload):
 			n_exp += 1
 			v = from_float(n_exp)
 		else:
@@ -2182,9 +2182,9 @@ static func afford_geometric_series(
 				g_add(
 					g_mul(
 						g_div(res, actual_start),
-						g_sub(ratio, from_float(1))
+						g_sub(ratio, BIGNUM_ONE)
 					), 
-					from_float(1)
+					BIGNUM_ONE
 				)
 			), 
 			g_log10(ratio)
