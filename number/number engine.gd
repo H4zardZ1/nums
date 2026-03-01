@@ -361,18 +361,18 @@ static func testable_random_num_struct(max_layer: float = 2.0 ** 1023.0, rng: Ra
 		v[1] = floorf(v[1])
 	return v
 
-## Converts the number back to a [float].
+## Converts the number to a [float].
 ## This may return 0 or [constant INF] since floats cannot support numbers as large as numbers of this library.
 static func to_float(n: PackedFloat64Array) -> float:
-	if is_nan(n[0]):
-		return NAN
+	if not is_finite(n[0]):
+		return n[0]
 	if not is_finite(n[1]):
 		return n[1]
 	if n[0] == 0:
-		return n[0]
+		return n[1]
 	if absf(n[0]) == 1:
 		return (10 ** n[1]) * signf(n[0])
-	if absf(n[0]) > 0: # Should be overflowing for normalized numbers
+	if absf(n[0]) > 0 and n[1] > 0: # Should be overflowing for normalized numbers
 		return INF * signf(n[0])
 	return 0
 
@@ -527,12 +527,6 @@ static func from_str(text: String, linear_hyper: bool = false) -> PackedFloat64A
 				return current
 	var ecount: int = text.get_slice_count("e") - 1
 	var n_exp2: float = text.get_slice("e", ecount).to_float()
-	# handle pruning of stuff like XeeYe (xeee1 -> xee10 so its fine)
-	# this is done because BigNumResource is eager
-	# (i tried lazy once and it sucked:tm: so much)
-	while (not is_finite(n_exp2)) and ecount > 1: 
-		ecount -= 1
-		n_exp2 = text.get_slice("e", ecount).to_float()
 	
 	if (ecount == 0) or (ecount == 1):
 		#ignore_warning: Exponent too high # i know what i'm doing godot, shut up with your runtime warnings
@@ -591,7 +585,7 @@ static func from_v_no_normalize(arg) -> PackedFloat64Array:
 		TYPE_BOOL:
 			return BigNumRef.BIGNUM_ONE if arg else BigNumRef.BIGNUM_ZERO
 		_:
-			push_error("Cannot construct number from parameter '{arg}'.".format({"arg": arg}))
+			push_error("Cannot construct number from parameter type '{type}' '{arg}'.".format({"arg": arg, "type": type_string(typeof(arg))}))
 			return BIGNUM_NAN.duplicate()
 
 # this is what i get for... not storing sign separately
@@ -847,9 +841,9 @@ static func g_floor(n: PackedFloat64Array) -> PackedFloat64Array:
 		return duplicate_num_only(n)
 	if n[1] < 0:
 		if g_sign(n) == -1:
-			return from_float(-1)
+			return BIGNUM_NEG_ONE.duplicate()
 		else:
-			return from_float(0)
+			return BIGNUM_ZERO.duplicate()
 	if g_sign(n) == -1:
 		return from_components(g_sign(n), 0.0, ceilf(n[1]))
 	return from_components(g_sign(n), 0.0, floorf(n[1]))
@@ -861,8 +855,6 @@ static func g_ceil(n: PackedFloat64Array) -> PackedFloat64Array:
 ## Rounds the number towards 0.
 ## This is equivalent to coercing a [float] to an [int], excluding very large floats.
 static func g_trunc(n: PackedFloat64Array) -> PackedFloat64Array:
-	if n[1] < 0:
-		return from_float(0)
 	if n[0] == 0:
 		return from_components(g_sign(n), 0, floor(n[1]) if n[1] > 0 else ceil(n[1])) 
 	return duplicate_num_only(n)
@@ -1679,7 +1671,7 @@ static func g_slog(base: PackedFloat64Array, to: PackedFloat64Array, linear: boo
 	var risen: bool = false
 	var v: PackedFloat64Array = g_slog_start(base, to, linear)
 	for i in range(max_i_other):
-		var t: PackedFloat64Array = g_tetrate(base, v, from_float(1), linear)
+		var t: PackedFloat64Array = g_tetrate(base, v, BIGNUM_ONE, linear)
 		var rising: bool = g_compare(to, t) < 0
 		if i > 1:
 			if rising != risen:
@@ -1723,7 +1715,7 @@ static func g_sroot(to: PackedFloat64Array, degree: PackedFloat64Array) -> Packe
 	if g_lte(degree, BIGNUM_ZERO):
 		return BIGNUM_NAN.duplicate()
 	if g_eq(BIGNUM_ONE, to):
-		return BIGNUM_ONE
+		return BIGNUM_ONE.duplicate()
 	# Infinite degree super-root is x^(1/x) between 1/e <= x <= e, undefined otherwise
 	if g_eq(degree, BIGNUM_INF):
 		var t := to_float(to)
@@ -2091,8 +2083,6 @@ static func g_atan2(y: PackedFloat64Array, x: PackedFloat64Array) -> PackedFloat
 	else: # why the hell are you inserting double zeros in this
 		return BIGNUM_NAN.duplicate()
 
-
-
 # @GlobalScope.sinh # (e^x - e^-x)/2
 ## Returns the hyperbolic sine of [param n]. See [method @GlobalScope.sinh]
 static func g_sinh(n: PackedFloat64Array) -> PackedFloat64Array:
@@ -2114,7 +2104,7 @@ static func g_cosh(n: PackedFloat64Array) -> PackedFloat64Array:
 static func g_tanh(n: PackedFloat64Array) -> PackedFloat64Array:
 	# Special Case: since Godot has tanh, use it on layer 0 numbers
 	if n[0] == 0:
-		return from_float(tanh(g_sign(n) * n[1]))
+		return from_float(tanh(n[1]))
 	return g_div(g_sinh(n), g_cosh(n))
 	
 # @GlobalScope.asinh
@@ -2123,7 +2113,7 @@ static func g_tanh(n: PackedFloat64Array) -> PackedFloat64Array:
 static func g_asinh(n: PackedFloat64Array) -> PackedFloat64Array:
 	# Special Case: Since Godot has asinh, use it on layer 0 numbers
 	if n[0] == 0:
-		return from_float(asinh(g_sign(n) * n[1]))
+		return from_float(asinh(n[1]))
 	return g_log(BIGNUM_E, g_add(n, g_root(from_float(2), g_add(from_float(1), g_pow(n, from_float(2))))))
 
 # @GlobalScope.acosh
@@ -2131,7 +2121,7 @@ static func g_asinh(n: PackedFloat64Array) -> PackedFloat64Array:
 ## [br]This returns 0 if [param n] is less than 1. See [method @GlobalScope.acosh]
 static func g_acosh(n: PackedFloat64Array) -> PackedFloat64Array:
 	if n[0] == 0:
-		return from_float(acosh(g_sign(n) * n[1]))
+		return from_float(acosh(n[1]))
 	# Godot wants to return 0 instead of NAN on x < 1. Let's do that
 	if n[1] < 1:
 		return BIGNUM_ZERO.duplicate()
@@ -2141,7 +2131,9 @@ static func g_acosh(n: PackedFloat64Array) -> PackedFloat64Array:
 ## Returns the hyperbolic arc tangent of [param n] in radians. Use this to get the angle from an angle's cosine in hyperbolic space.
 ## [br]This returns a signed infinity if [param n] is more than or equal to 1 or less than or equal to -1.
 static func g_atanh(n: PackedFloat64Array) -> PackedFloat64Array:
-	if n[1] >= 1: 
+	if n[0] == 0:
+		return from_float(atanh(n[1]))
+	if g_compare_abs(n, BIGNUM_ONE) > 1: 
 		# Godot wants to return signed INF instead of NAN on x > 1 or x < -1. Let's do that
 		return from_components_no_normalize(g_sign(n), INF, INF)
 	return g_div(g_log(BIGNUM_E, g_div(g_add(from_float(1), n), g_sub(from_float(1), n))), from_float(2))
@@ -2208,9 +2200,9 @@ static func sum_geometric_series(
 	return g_div(
 		g_mul(
 			g_mul(price_start, g_pow(ratio, current_owned)),
-			g_sub(from_float(1), g_pow(ratio, items))
+			g_sub(BIGNUM_ONE, g_pow(ratio, items))
 		), 
-		g_sub(from_float(1), ratio)
+		g_sub(BIGNUM_ONE, ratio)
 	)
 
 ## Returns the length of the sum of an arithmetic series starting at [param price_start], additionally offset by [param current_owned]
@@ -2253,7 +2245,7 @@ static func sum_arithmetic_series(
 		g_div(items, from_float(2)),
 		g_add(
 			g_mul(actual_start, from_float(2)), 
-			g_mul(g_sub(items, from_float(1)), increase)
+			g_mul(g_sub(items, BIGNUM_ONE), increase)
 		)
 	)
 
@@ -2261,7 +2253,7 @@ static func sum_arithmetic_series(
 
 
 # variables
-## The PackedFloat64Array representation of ths
+## The PackedFloat64Array representation of the number this BigNumRef holds.
 var d: PackedFloat64Array:
 	set(value):
 		n_layer = value[0]
@@ -2436,7 +2428,6 @@ func defer_l_normalize() -> void:
 		call_deferred("l_normalize")
 		_dirty_l_normalize = true
 
-# usually you don't need to use this
 ## Normalizes the number currently held by this reference.[br]
 ## [b]Note:[/b] Users of this library should not need to use this function.
 func l_normalize() -> void:
