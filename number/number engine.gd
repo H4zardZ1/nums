@@ -245,18 +245,19 @@ static func f_lambertw(z: float, principal: bool = true, tolerance: float = 1e-1
 			return z
 		if z == 1:
 			return LAMBERTW_ONE_ZERO
-
 		if (z < 10):
 			w = 0
 		else:
 			w = log(z) - log(log(z))
-	else:
-		if z == 0:
-			return -INF
+	elif z < 0:
 		if z <= -0.1:
 			w = -2
 		else:
-			w = log(z) - log(-log(-z))
+			w = log(-z) - log(-log(-z))
+	elif z == 0:
+		return -INF
+	else:
+		return NAN
 	for i in range(max_i_lambertw):
 		wn = (z * exp(-w) + w * w) / (w + 1)
 		if absf(wn - w) < tolerance * absf(wn):
