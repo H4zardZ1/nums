@@ -651,7 +651,7 @@ static func g_to_str(n: PackedFloat64Array) -> String:
 	if !g_is_finite(n):
 		return "-inf" if g_sign(n) == -1 else "inf"
 	if n[0] == 0:
-		if (1e-7 < n[1] and n[1] < EXPONENT_WRITTEN) or n[1] == 0:
+		if (1e-7 < absf(n[1]) and absf(n[1]) < EXPONENT_WRITTEN) or n[1] == 0:
 			return var_to_str(n[1])
 		return "{m}e{e}".format({"m": g_get_mantissa(n), "e": g_get_exp(n)})
 	if absf(n[0]) == 1:
@@ -675,10 +675,10 @@ static func g_to_str_to_decimal_places(n: PackedFloat64Array, round_to: int = de
 	if n[1] < ipow10(-round_to):
 		return "0.0"
 	if n[0] == 0:
-		if (n[1] < EXPONENT_WRITTEN) or n[1] == 0:
+		if (absf(n[1]) < absf(EXPONENT_WRITTEN)) or n[1] == 0:
 			return var_to_str(snappedf((n[1] * g_sign(n)), ipow10(-round_to)))
 		return "{m}e{e}".format({"m": snappedf(g_get_mantissa(n), ipow10(-round_to)), "e": g_get_exp(n)})
-	if n[0] == 1:
+	if absf(n[0]) == 1:
 		if (n[1] < EXPONENT_WRITTEN):
 			return "{m}e{e}".format({"m": snappedf(g_get_mantissa(n), ipow10(-round_to)), "e": var_to_str(g_get_exp(n)).get_slice(".", 0)})
 		# return "{m}e{e}".format({"m": snappedf(g_get_mantissa(n), ipow10(-round_to)), "e": snappedf(g_get_exp(n), ipow10(-round_to))})
