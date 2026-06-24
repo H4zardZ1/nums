@@ -573,6 +573,8 @@ static func from_v_no_normalize(arg) -> PackedFloat64Array:
 			return from_str(arg)
 		TYPE_PACKED_FLOAT64_ARRAY:
 			return duplicate_num_only_no_normalize(arg)
+		TYPE_PACKED_BYTE_ARRAY:
+			return from_bytes_no_normalize(arg)
 		TYPE_DICTIONARY:
 			if "sign" in arg and arg.sign is int and "layer" in arg and arg.layer is float and "mag" in arg and arg.mag is float:
 				return from_components_no_normalize(arg.sign, arg.layer, arg.mag)
